@@ -9,6 +9,7 @@
 #define AssetsFolder "./assets"
 
 #define IMAGE(PATH) PathConcat(ImageFolder, "/" PATH)
+#define VIDEO(PATH) PathConcat(VideoFolder, "/" PATH)
 #define EXPORT(PATH) PathConcat(ExportFolder, "/" PATH)
 
 // Useful later on, when absolute paths are required
