@@ -1,4 +1,5 @@
 #include "skin_detector.h"
+#include <tuple>
 
 cv::Mat SkinDetector::hsvMask(cv::Mat &img, unsigned char thresh)
 {
@@ -52,7 +53,7 @@ cv::Mat SkinDetector::ycrcbMask(cv::Mat &img, unsigned char thresh)
   return mask;
 }
 
-cv::Mat SkinDetector ::cutMask(cv::Mat &img, cv::Mat &mask)
+cv::Mat SkinDetector::cutMask(cv::Mat &img, cv::Mat &mask)
 {
   cv::Mat dst, free;
   cv::filter2D(
@@ -83,29 +84,49 @@ cv::Mat SkinDetector ::cutMask(cv::Mat &img, cv::Mat &mask)
   return grabMask;
 }
 
-cv::Mat SkinDetector ::closing(cv::Mat &mask)
+std::tuple<cv::Mat, cv::Point> ellipticKernel(int size)
 {
+  cv::Point anchor(size, size);
+  cv::Mat kernel = cv::getStructuringElement(
+    cv::MORPH_ELLIPSE,
+    cv::Size(2 * size + 1, 2 * size + 1),
+    anchor
+  );
+  return std::make_tuple(kernel, anchor);
+}
+
+cv::Mat SkinDetector::closing(cv::Mat &mask)
+{
+  cv::GaussianBlur(
+    mask, mask,
+    cv::Size(2 * this->blurKernel + 1, 2 * this->blurKernel + 1),
+    0.0
+  );
+  cv::threshold(mask, mask, 127, 255, cv::THRESH_BINARY);
+
+  std::tuple<cv::Mat, cv::Point> ock = ellipticKernel(this->openCloseKernel);
   cv::morphologyEx(
     mask, mask,
     cv::MORPH_CLOSE,
-    cv::getStructuringElement(cv::MORPH_ELLIPSE, cv::Size(5, 5))
+    std::get<0>(ock),
+    std::get<1>(ock),
+    1
   );
 
-  cv::morphologyEx(
+  cv::GaussianBlur(
     mask, mask,
-    cv::MORPH_OPEN,
-    cv::getStructuringElement(cv::MORPH_ELLIPSE, cv::Size(3, 3)),
-    cv::Point(-1, -1),
-    2
+    cv::Size(2 * this->blurKernel + 1, 2 * this->blurKernel + 1),
+    0.0
   );
+  cv::threshold(mask, mask, 127, 255, cv::THRESH_BINARY);
 
-  cv::Mat kernel = cv::getStructuringElement(
-    cv::MORPH_ELLIPSE,
-    cv::Size(2 * this->erosionKernel + 1, 2 * this->erosionKernel + 1),
-    cv::Point(this->erosionKernel, this->erosionKernel)
+  std::tuple<cv::Mat, cv::Point> ek = ellipticKernel(this->erodeKernel);
+  cv::erode(
+    mask, mask,
+    std::get<0>(ek),
+    std::get<1>(ek),
+    1
   );
-
-  cv::erode(mask, mask, kernel);
 
   return mask;
 }

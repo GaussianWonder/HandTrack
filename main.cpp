@@ -12,21 +12,14 @@
 
 #define CAMERA "Camera"
 #define OUTPUT "Processed"
-#define CTHRESH "Combined Threshold"
-#define EKERNEL "Erode Kernel"
+#define OPEN_CLOSE_KERNEL "Open/Close Kernel"
+#define GAUSSIAN_BLUR_KERNEL "Blur Kernel"
+#define EROSION_KERNEL "Erode Kernel"
 
-static void getHsvThreshTrack(int pos, void *rawDetector) {
+SkinDetector* fromRaw(void *rawDetector)
+{
   ASSERT(rawDetector != nullptr, "There is no skin detector around here");
-
-  SkinDetector *detect = (SkinDetector *)rawDetector;
-  detect->addHsvMask = (pos + 1);
-}
-
-static void getErodeKernTrack(int pos, void *rawDetector){
-  ASSERT(rawDetector != nullptr, "There is no skin detector around here");
-
-  SkinDetector *detect = (SkinDetector *)rawDetector;
-  detect->erosionKernel = (pos + 1);
+  return (SkinDetector *)rawDetector;
 }
 
 int main() {
@@ -39,10 +32,36 @@ int main() {
   cv::namedWindow(CAMERA);
   cv::namedWindow(OUTPUT);
 
-  // Assign slider controls for the skin detector
-  cv::createTrackbar(CTHRESH, OUTPUT, &detect.addHsvMask, 1000, getHsvThreshTrack, (void*) &detect);
-  cv::createTrackbar(EKERNEL, OUTPUT, &detect.erosionKernel, 10, getHsvThreshTrack, (void*) &detect);
+  // Assign slider controls for the skin detector controls
+  cv::createTrackbar(
+    OPEN_CLOSE_KERNEL, OUTPUT,
+    &detect.openCloseKernel, 10,
+    [](int pos, void *r) {
+      SkinDetector *d = fromRaw(r);
+      d->openCloseKernel = pos;
+    },
+    (void*) &detect
+  );
+  cv::createTrackbar(
+    GAUSSIAN_BLUR_KERNEL, OUTPUT,
+    &detect.blurKernel, 3,
+    [](int pos, void *r) {
+      SkinDetector *d = fromRaw(r);
+      d->blurKernel = pos;
+    },
+    (void*) &detect
+  );
+  cv::createTrackbar(
+    EROSION_KERNEL, OUTPUT,
+    &detect.erodeKernel, 3,
+    [](int pos, void *r) {
+      SkinDetector *d = fromRaw(r);
+      d->erodeKernel = pos;
+    },
+    (void*) &detect
+  );
 
+  // Create instance of VideoCapture
   // cv::VideoCapture capture(VIDEO("test.mp4"));
   // cv::VideoCapture capture(VIDEO("test2.mp4"));
   cv::VideoCapture capture(VIDEO("test3.mp4"));
@@ -63,11 +82,15 @@ int main() {
       break;
     }
 
-    cv::imshow(CAMERA, frame);
-    cv::Mat processed(frame.size(), CV_8UC3, cv::Scalar(0));
+    // Resize frame to ease processing
+    cv::Mat resized(cv::Size(frame.cols / 2, frame.rows / 2), CV_8UC3, cv::Scalar(0));
+    cv::resize(frame, resized, cv::Size(frame.cols / 2, frame.rows / 2), 0.5, 0.5, cv::INTER_CUBIC);
 
-    detect(frame, processed);
+    cv::Mat processed(resized.size(), CV_8UC3, cv::Scalar(0));
 
+    detect(resized, processed);
+
+    cv::imshow(CAMERA, resized);
     cv::imshow(OUTPUT, processed);
 
     // Process frame

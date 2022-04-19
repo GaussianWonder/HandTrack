@@ -17,8 +17,7 @@ public:
     // Get masks
     cv::Mat hsvM(hsvMask(dst)),
         rgbM(rgbMask(dst)),
-        ycrbrM(ycrcbMask(dst)),
-        temp;
+        ycrbrM(ycrcbMask(dst));
 
     // Average masks and apply last threshold
     dst = cv::Mat(src.size(), CV_8UC1, cv::Scalar(0));
@@ -26,17 +25,20 @@ public:
     cv::imshow("HSV", hsvM);
     cv::imshow("RGB", rgbM);
     cv::imshow("YCRBR", ycrbrM);
-    dst += (hsvM / (int(1000 / this->addHsvMask) + 1)) + rgbM + ycrbrM;
-    dst /= 3;
 
-    threshold(dst, dst, 0, 255, cv::THRESH_BINARY);
+    cv::bitwise_or(rgbM, ycrbrM, dst);
 
-    dst = closing(dst);
-    dst = cutMask(src, dst);
+    cv::threshold(dst, dst, 127, 255, cv::THRESH_BINARY);
+
+    cv::imshow("RGB | YCRBR", dst);
+
+    dst = closing(dst).clone();
+    dst = cutMask(src, dst).clone();
   }
 
-  int addHsvMask = 1000;
-  int erosionKernel = 3;
+  int openCloseKernel = 6;
+  int blurKernel = 2;
+  int erodeKernel = 2;
 
 private:
   cv::Mat hsvMask(cv::Mat &img, unsigned char thresh = 127);
