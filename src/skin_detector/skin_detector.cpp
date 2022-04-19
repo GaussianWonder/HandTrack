@@ -1,4 +1,4 @@
-#include "../header/skinDetector.hpp"
+#include "skin_detector.h"
 
 using namespace std;
 using namespace cv;
