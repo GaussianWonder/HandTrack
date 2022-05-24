@@ -37,14 +37,32 @@ using ProcessedFrame = std::tuple<HandEdges, HandDebugDraw>;
  * @param detected frame run through a detector
  */
 ProcessedFrame processFrame(const cv::Mat &detected) {
-  cv::RNG RNG((int) time(0));
-  cv::Scalar fingertipColor = cv::Scalar(RNG.uniform(0, 256), RNG.uniform(0,256), RNG.uniform(0,256));
-
   ObjectTrace trace(detected);
   cv::Mat drawing = trace.draw(detected.size());
 
-  for (auto &point : trace.hull) {
-    cv::circle(drawing, point, 2, fingertipColor, -1);
+  cv::RNG RNG((int) time(0));
+
+  cv::circle(drawing, trace.hullCenter, 3, cv::Scalar(RNG.uniform(0, 256), RNG.uniform(0,256), RNG.uniform(0,256)));
+  cv::circle(drawing, trace.contourCenter, 2, cv::Scalar(RNG.uniform(0, 256), RNG.uniform(0,256), RNG.uniform(0,256)));
+
+  cv::Rect boundingBox = cv::boundingRect(trace.hull);
+  cv::rectangle(drawing, boundingBox, cv::Scalar(RNG.uniform(0, 255), RNG.uniform(0, 255), RNG.uniform(0, 255)));
+
+  cv::Point center = cv::Point(boundingBox.x + boundingBox.width / 2, boundingBox.y + boundingBox.height / 2);
+  cv::circle(drawing, center, 5, cv::Scalar(RNG.uniform(0, 255), RNG.uniform(0, 255), RNG.uniform(0, 255)));
+
+  cv::Scalar fingertipColor(RNG.uniform(0, 256), RNG.uniform(0,256), RNG.uniform(0,256));
+  for (auto &point : trace.hullDefects) {
+    cv::Point ptStart(trace.contour[point[0]]);
+    cv::Point ptEnd(trace.contour[point[1]]);
+    cv::Point ptFar(trace.contour[point[2]]);
+
+    double angle = std::atan2(center.y - ptStart.y, center.x - ptStart.x) * 180 / CV_PI;
+    double inAngle = innerAngle(ptStart.x, ptStart.y, ptEnd.x, ptEnd.y, ptFar.x, ptFar.y);
+    double length = std::sqrt(std::pow(ptStart.x - ptFar.x, 2) + std::pow(ptStart.y - ptFar.y, 2));
+    if (angle > -30 && angle < 160 && std::abs(inAngle) > 20 && std::abs(inAngle) < 120 && length > 0.1 * boundingBox.height) {
+      cv::circle(drawing, ptStart, 9, fingertipColor, cv::FILLED);
+    }
   }
 
   return std::make_tuple(detected, drawing);

@@ -50,6 +50,9 @@ public:
   std::vector<cv::Point> hull;
   std::vector<cv::Vec4i> hullDefects;
 
+  cv::Point hullCenter;
+  cv::Point contourCenter;
+
   std::vector<cv::Vec4i> hierarchy;
 
   double area = -1;
@@ -59,5 +62,8 @@ public:
 
   cv::Mat draw(const cv::Size &size);
 };
+
+float innerAngle(float px1, float py1, float px2, float py2, float cx1, float cy1);
+float innerAngle(const cv::Point &p1, const cv::Point &p2, const cv::Point &p3);
 
 #endif

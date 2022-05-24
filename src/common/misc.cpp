@@ -1,6 +1,7 @@
 #include "misc.h"
 #include "logger.h"
 #include <algorithm>
+#include <math.h>
 
 KEY resolvedKey(const int key)
 {
@@ -85,8 +86,6 @@ ObjectTrace::ObjectTrace(const cv::Mat &binaryImage)
     }
   }
 
-  INFO("index largest {} with area {}, total contours: {}", largestContour, maxArea, contours.size());
-
   if (maxArea > 0) {
     std::copy(contours[largestContour].begin(), contours[largestContour].end(), std::back_inserter(this->contour));
     cv::Mat contourMat(contours[largestContour]);
@@ -102,6 +101,16 @@ ObjectTrace::ObjectTrace(const cv::Mat &binaryImage)
     std::vector<cv::Vec4i> convexityDefects;
     cv::convexityDefects(contourMat, hullIndexes, convexityDefects);
     std::copy(convexityDefects.begin(), convexityDefects.end(), std::back_inserter(this->hullDefects));
+
+    {
+      cv::Moments m = cv::moments(this->contour);
+      this->contourCenter = cv::Point(m.m10 / m.m00, m.m01 / m.m00);
+    }
+
+    {
+      cv::Moments m = cv::moments(this->hull);
+      this->hullCenter = cv::Point(m.m10 / m.m00, m.m01 / m.m00);
+    }
   }
 }
 
@@ -122,6 +131,10 @@ cv::Mat ObjectTrace::draw(const cv::Size &size)
   cv::drawContours(drawing, contours, 0, cv::Scalar(RNG.uniform(0, 256), RNG.uniform(0,256), RNG.uniform(0,256)));
   cv::drawContours(drawing, hulls, 0, cv::Scalar(RNG.uniform(0, 256), RNG.uniform(0,256), RNG.uniform(0,256)));
 
+  cv::Scalar hullPtColor(RNG.uniform(0, 256), RNG.uniform(0,256), RNG.uniform(0,256));
+  for (auto &point : this->hull)
+    cv::circle(drawing, point, 2, hullPtColor, -1);
+
   cv::Scalar defectColor(RNG.uniform(0, 256), RNG.uniform(0,256), RNG.uniform(0,256));
   cv::Scalar defectLine(RNG.uniform(0, 256), RNG.uniform(0,256), RNG.uniform(0,256));
   for(auto &defect : this->hullDefects) {
@@ -135,3 +148,54 @@ cv::Mat ObjectTrace::draw(const cv::Size &size)
 
   return drawing;
 }
+
+float innerAngle(float px1, float py1, float px2, float py2, float cx1, float cy1)
+{
+  float dist1 = std::sqrt( (px1-cx1)*(px1-cx1) + (py1-cy1)*(py1-cy1) );
+  float dist2 = std::sqrt( (px2-cx1)*(px2-cx1) + (py2-cy1)*(py2-cy1) );
+
+  float Ax, Ay;
+  float Bx, By;
+  float Cx, Cy;
+
+  // find closest point to C  
+  // DEBUG("dist1: {}, dist2: {}", dist1, dist2);
+
+  Cx = cx1;
+  Cy = cy1;
+  if(dist1 < dist2) {
+    Bx = px1;
+    By = py1;
+    Ax = px2;
+    Ay = py2;
+  } else {
+    Bx = px2;
+    By = py2;
+    Ax = px1;
+    Ay = py1;
+  }
+
+  float Q1 = Cx - Ax;
+  float Q2 = Cy - Ay;
+  float P1 = Bx - Ax;
+  float P2 = By - Ay;
+
+  float A = std::acos( (P1*Q1 + P2*Q2) / ( std::sqrt(P1*P1+P2*P2) * std::sqrt(Q1*Q1+Q2*Q2) ) );
+
+  A = A * 180 / CV_PI;
+
+  return A;
+}
+
+float innerAngle(const cv::Point &p1, const cv::Point &p2, const cv::Point &p3)
+{
+  innerAngle(p1.x, p1.y, p2.x, p2.y, p3.x, p3.y);
+}
+
+// float innerAngle(const cv::Point &p1, const cv::Point &p2, const cv::Point &p3)
+// {
+//   const cv::Point v1 = p2 - p1;
+//   const cv::Point v2 = p3 - p2;
+//   const float angle = std::acos(cv::norm(v1) * cv::norm(v2) + cv::dotProduct(v1, v2)) / (cv::norm(v1) * cv::norm(v2));
+//   return angle;
+// }
