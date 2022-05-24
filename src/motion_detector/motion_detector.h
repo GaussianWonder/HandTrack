@@ -3,36 +3,31 @@
 
 #include <vector>
 #include <string>
+#include <array>
 #include <opencv2/imgproc.hpp>
 #include <opencv2/core.hpp>
 
 #include <opencv2/highgui.hpp>
 
+cv::Mat getBackground(const std::vector<cv::Mat> &frames, const std::size_t medianFrameCount);
+
+template<std::size_t WSZ>
 class MotionDetector
 {
 public:
-  // TODO maybe use this
-  enum class MedianPickDistribution {
-    ASCENDING_START,
-    RANDOM,
-  };
+  MotionDetector(const std::vector<cv::Mat> &frames, const std::size_t medianFrameCount = 60)
+    :background(getBackground(frames, medianFrameCount))
+  {}
 
-  MotionDetector(const std::vector<cv::Mat> &frames, const std::size_t medianFrameCount = 60, const std::size_t frameDifferenceCount = 8);
-
-  void operator()(cv::Mat &src, cv::Mat &dst)
+  void operator()(const std::vector<cv::Mat> &frames)
   {
     
   }
 
-  // used to getBackgrund()
-  std::size_t medianFrameCount;
-  // frame window to detect motion body
-  std::size_t frameDifferenceCount;
+  constexpr static std::size_t windowSize = WSZ;
 private:
   // result of getBackground()
   cv::Mat background;
-
-  cv::Mat getBackground(const std::vector<cv::Mat> &frames);
 };
 
 #endif // __MOTION_DETECTOR_H__

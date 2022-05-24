@@ -35,7 +35,7 @@ KEY resolvedKey(const int key);
 #define WaitKey(D) (cv::waitKey(D) & 0xEFFFFF)
 
 // Reading And Converting Images/Videos
-std::vector<cv::Mat> getVideoFrames(cv::VideoCapture &capture, const int scaleTarget = 600);
+std::vector<cv::Mat> getVideoFrames(cv::VideoCapture &capture, const int widthTarget = 600, const int heightTarget = 600);
 std::vector<cv::Mat> convertAll(const std::vector<cv::Mat> &frames, const cv::ColorConversionCodes conversionType = cv::COLOR_BGR2GRAY);
 
 // Image scaling
@@ -43,5 +43,21 @@ std::vector<cv::Mat> convertAll(const std::vector<cv::Mat> &frames, const cv::Co
 cv::Mat scaleImage(const cv::Mat &image, const double scale, const int type = CV_8UC3);
 cv::Mat newGray(const cv::Size &size, const cv::Scalar &color = cv::Scalar::all(0));
 cv::Mat newColor(const cv::Size &size, const cv::Scalar &color = cv::Scalar::all(0));
+
+class ObjectTrace {
+public:
+  std::vector<cv::Point> contour;
+  std::vector<cv::Point> hull;
+  std::vector<cv::Vec4i> hullDefects;
+
+  std::vector<cv::Vec4i> hierarchy;
+
+  double area = -1;
+
+  ObjectTrace(){}
+  ObjectTrace(const cv::Mat &binaryImage);
+
+  cv::Mat draw(const cv::Size &size);
+};
 
 #endif
