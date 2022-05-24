@@ -34,4 +34,14 @@ KEY resolvedKey(const int key);
 // Wait for key press and return a consistent key across platforms
 #define WaitKey(D) (cv::waitKey(D) & 0xEFFFFF)
 
+// Reading And Converting Images/Videos
+std::vector<cv::Mat> getVideoFrames(cv::VideoCapture &capture, const int scaleTarget = 600);
+std::vector<cv::Mat> convertAll(const std::vector<cv::Mat> &frames, const cv::ColorConversionCodes conversionType = cv::COLOR_BGR2GRAY);
+
+// Image scaling
+
+cv::Mat scaleImage(const cv::Mat &image, const double scale, const int type = CV_8UC3);
+cv::Mat newGray(const cv::Size &size, const cv::Scalar &color = cv::Scalar::all(0));
+cv::Mat newColor(const cv::Size &size, const cv::Scalar &color = cv::Scalar::all(0));
+
 #endif

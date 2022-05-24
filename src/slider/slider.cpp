@@ -10,6 +10,11 @@ Slider::Slider(Executors executors)
   size = executors.size();
 }
 
+Slider::Slider(std::size_t size)
+  :size(size)
+  ,executors({})
+{}
+
 void Slider::next()
 {
   currentIndex = currentIndex == size - 1 ? 0 : currentIndex + 1;
@@ -25,4 +30,9 @@ void Slider::previous()
 void Slider::exec()
 {
   executors[currentIndex]();
+}
+
+std::size_t Slider::getCurrentIndex() const
+{
+  return currentIndex;
 }

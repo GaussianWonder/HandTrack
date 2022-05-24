@@ -9,6 +9,7 @@
 
 #include "spaces.h"
 #include "skin_detector.h"
+#include "motion_detector.h"
 
 #define CAMERA "Camera"
 #define SKIN_MASK "Skin Mask"
@@ -29,65 +30,53 @@ SkinDetector* fromRaw(void *rawDetector)
   return (SkinDetector *)rawDetector;
 }
 
+// canny edge detection controls
 int canny_low = 0;
 int canny_high = 100;
 
+using SkinMask = cv::Mat;
+using HandEdges = cv::Mat;
+using HandHullEdges = cv::Mat;
+using ProcessedFrame = std::tuple<SkinMask, HandEdges, HandHullEdges>;
+
+/**
+ * @brief Processes a cv::Mat frame and returns (for debug purposes) a tuple of images that resemble steps of the algorithm
+ * 
+ * @param frame the cv::Mat image to process
+ * @param scaleTarget The desired scaling of the image before processing. If smaller, this is ignored.
+ * @param skinDetector see SkinDetector. This should be replaced with an Adapter for any backround substraction algorithms
+ */
+ProcessedFrame processFrame(const cv::Mat &frame, SkinDetector &detect) {
+  // Detect skin in frame
+  cv::Mat skin_mask = newGray(frame.size());
+  detect(frame, skin_mask);
+
+  // Canny Edge Detection and Convex Hull
+  cv::Mat detected_edges = newGray(skin_mask.size());
+  cv::Canny(skin_mask, detected_edges, canny_low, canny_high);
+
+  std::vector<std::vector<cv::Point>> contours;
+  cv::findContours(detected_edges, contours, cv::RETR_TREE, cv::CHAIN_APPROX_SIMPLE);
+
+  std::vector<std::vector<cv::Point>> hull(contours.size());
+  for(std::size_t i = 0; i < contours.size(); ++i) {
+    cv::convexHull(contours[i], hull[i]);
+  }
+
+  cv::Mat drawing = newColor(detected_edges.size());
+  for(std::size_t i = 0; i < contours.size(); ++i) {
+    if (contours[i].size() >= 500) {
+      cv::Scalar color = cv::Scalar(RNG.uniform(0, 256), RNG.uniform(0,256), RNG.uniform(0,256));
+      cv::drawContours(drawing, contours, (int)i, color);
+      cv::drawContours(drawing, hull, (int)i, color);
+    }
+  }
+
+  return std::make_tuple(skin_mask, detected_edges, drawing);
+}
+
 int main() {
   Logger::init();
-
-  // Create the skin detector
-  SkinDetector detect;
-
-  // Create the windows
-  cv::namedWindow(CAMERA);
-  cv::namedWindow(SKIN_MASK);
-  cv::namedWindow(HAND_EDGE);
-
-  // Assign slider controls for the skin detector controls
-  cv::createTrackbar(
-    OPEN_CLOSE_KERNEL, SKIN_MASK,
-    &detect.openCloseKernel, 10,
-    [](int pos, void *r) {
-      SkinDetector *d = fromRaw(r);
-      d->openCloseKernel = pos;
-    },
-    (void*) &detect
-  );
-  cv::createTrackbar(
-    GAUSSIAN_BLUR_KERNEL, SKIN_MASK,
-    &detect.blurKernel, 3,
-    [](int pos, void *r) {
-      SkinDetector *d = fromRaw(r);
-      d->blurKernel = pos;
-    },
-    (void*) &detect
-  );
-  cv::createTrackbar(
-    EROSION_KERNEL, SKIN_MASK,
-    &detect.erodeKernel, 3,
-    [](int pos, void *r) {
-      SkinDetector *d = fromRaw(r);
-      d->erodeKernel = pos;
-    },
-    (void*) &detect
-  );
-
-  cv::createTrackbar(
-    CANNY_LOW, HAND_EDGE,
-    &canny_low, 100,
-    [](int pos, void *r) {
-      *((int*)r) = pos;
-    },
-    (void*) &canny_low
-  );
-  cv::createTrackbar(
-    CANNY_HIGH, HAND_EDGE,
-    &canny_high, 200,
-    [](int pos, void *r) {
-      *((int*)r) = pos;
-    },
-    (void*) &canny_high
-  );
 
   // Create instance of VideoCapture
   // cv::VideoCapture capture(VIDEO("test.mp4"));
@@ -99,77 +88,104 @@ int main() {
     return -1;
   }
 
-  KEY operation = KEY::NONE;
-  while (operation != KEY::ESC) {
-    // Extract frame from video
-    cv::Mat frame;
-    capture >> frame;
+  // Spread video into cv::Mat frames
+  std::vector<cv::Mat> frames = getVideoFrames(capture);
+  capture.release();
 
-    if (frame.empty()) {
-      DEBUG("Received empty frame, returning...");
+  // Convert all frames to grayscale
+  std::vector<cv::Mat> gray_frames = convertAll(frames, cv::COLOR_BGR2GRAY);
+
+  // Create the skin detector
+  SkinDetector detect;
+  // Create the motion detector
+  // MotionDetector inMotion(gray_frames);
+
+  // Slider to control the current video frame rendering
+  Slider slider(frames.size());
+  // Current key pressed
+  KEY operation = KEY::NONE;
+ 
+  // On Event Changed handler
+  auto onChangeHandler = [&](){
+    ProcessedFrame result = processFrame(frames[slider.getCurrentIndex()], detect);
+
+    cv::imshow(CAMERA, frames[slider.getCurrentIndex()]);
+    cv::imshow(SKIN_MASK, std::get<0>(result));
+    cv::imshow(HAND_EDGE, std::get<2>(result));
+  };
+
+  // Before entering the event loop create the windows and assign control callbacks
+  { // Create the windows and assign slider controls
+    cv::namedWindow(CAMERA);
+    cv::namedWindow(SKIN_MASK);
+    cv::namedWindow(HAND_EDGE);
+
+    cv::createTrackbar(
+      OPEN_CLOSE_KERNEL, SKIN_MASK,
+      &detect.openCloseKernel, 10,
+      [](int pos, void *r) {
+        SkinDetector *d = fromRaw(r);
+        d->openCloseKernel = pos;
+      },
+      (void*) &detect
+    );
+    cv::createTrackbar(
+      GAUSSIAN_BLUR_KERNEL, SKIN_MASK,
+      &detect.blurKernel, 3,
+      [](int pos, void *r) {
+        SkinDetector *d = fromRaw(r);
+        d->blurKernel = pos;
+      },
+      (void*) &detect
+    );
+    cv::createTrackbar(
+      EROSION_KERNEL, SKIN_MASK,
+      &detect.erodeKernel, 3,
+      [](int pos, void *r) {
+        SkinDetector *d = fromRaw(r);
+        d->erodeKernel = pos;
+      },
+      (void*) &detect
+    );
+
+    cv::createTrackbar(
+      CANNY_LOW, HAND_EDGE,
+      &canny_low, 100,
+      [](int pos, void *r) {
+        *((int*)r) = pos;
+      },
+      (void*) &canny_low
+    );
+    cv::createTrackbar(
+      CANNY_HIGH, HAND_EDGE,
+      &canny_high, 200,
+      [](int pos, void *r) {
+        *((int*)r) = pos;
+      },
+      (void*) &canny_high
+    );
+  }
+
+  // Event Loop
+  while (operation != KEY::ESC) {
+    // Input handling
+    switch (operation)
+    {
+    case KEY::LEFT_ARROW:
+      slider.previous();
+      onChangeHandler();
+      break;
+    case KEY::RIGHT_ARROW:
+      slider.next();
+      onChangeHandler();
+      break;
+    case KEY::SPACE:
+      onChangeHandler();
       break;
     }
 
-    // Process frame
-    // Resize frame to ease processing
-    cv::Mat resized(cv::Size(frame.cols / 2, frame.rows / 2), CV_8UC3, cv::Scalar(0));
-    cv::resize(frame, resized, cv::Size(frame.cols / 2, frame.rows / 2), 0.5, 0.5, cv::INTER_CUBIC);
-
-    cv::Mat skin_mask(resized.size(), CV_8UC3, cv::Scalar(0));
-
-    detect(resized, skin_mask);
-
-    cv::imshow(CAMERA, resized);
-    cv::imshow(SKIN_MASK, skin_mask);
-
-    // Canny edge detection and Convex Hull
-    cv::Mat edges(skin_mask.size(), CV_8UC1, cv::Scalar::all(0));
-    cv::Mat detected_edges = skin_mask.clone();
-    cv::Canny(skin_mask, detected_edges, canny_low, canny_high);
-    detected_edges.copyTo(edges);
-
-    std::vector<std::vector<cv::Point>> contours;
-    cv::findContours(detected_edges, contours, cv::RETR_TREE, cv::CHAIN_APPROX_SIMPLE);
-
-    std::vector<std::vector<cv::Point>> hull(contours.size());
-    for(std::size_t i = 0; i < contours.size(); ++i)
-    {
-      cv::convexHull(contours[i], hull[i]);
-    }
-
-    cv::Mat drawing = cv::Mat::zeros(detected_edges.size(), CV_8UC3);
-    // for(std::size_t i = 0; i < contours.size(); ++i)
-    // {
-    //   if (contours[i].size() >= 500) {
-    //     cv::Scalar color = cv::Scalar(RNG.uniform(0, 256), RNG.uniform(0,256), RNG.uniform(0,256));
-    //     cv::drawContours(drawing, contours, (int)i, color);
-    //     cv::drawContours(drawing, hull, (int)i, color);
-    //   }
-    // }
-    if (contours.size()) {
-      std::size_t maxI = 0;
-      std::size_t maxSize = contours[0].size();
-      for(std::size_t i = 1; i < contours.size(); ++i)
-      {
-        if (contours[i].size() > maxSize) {
-          maxI = i;
-          maxSize = contours[i].size();
-        } 
-      }
-      cv::Scalar color = cv::Scalar(RNG.uniform(0, 256), RNG.uniform(0,256), RNG.uniform(0,256));
-      cv::drawContours(drawing, contours, (int)maxI, color);
-      cv::drawContours(drawing, hull, (int)maxI, color);
-      cv::imshow(HAND_EDGE, detected_edges);
-    }
-
     operation = WaitKey(25);
-    switch (operation) {
-      default:
-        break;
-    }
   }
-
-  capture.release();
 
   cv::destroyAllWindows();
 

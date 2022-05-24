@@ -14,11 +14,14 @@ class Slider {
   std::size_t size = 0;
 public:
   Slider(Executors executors);
+  Slider(std::size_t size);
   ~Slider() = default;
 
   void next();
   void previous();
   void exec();
+
+  std::size_t getCurrentIndex() const;
 };
 
 #endif

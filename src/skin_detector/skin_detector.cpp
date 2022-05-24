@@ -1,7 +1,7 @@
 #include "skin_detector.h"
 #include <tuple>
 
-cv::Mat SkinDetector::hsvMask(cv::Mat &img, unsigned char thresh)
+cv::Mat SkinDetector::hsvMask(const cv::Mat &img, unsigned char thresh)
 {
   // Lower threshold 0    50  0
   // Upper threshold 120  255 255
@@ -14,7 +14,7 @@ cv::Mat SkinDetector::hsvMask(cv::Mat &img, unsigned char thresh)
   return mask;
 }
 
-cv::Mat SkinDetector::rgbMask(cv::Mat &img)
+cv::Mat SkinDetector::rgbMask(const cv::Mat &img)
 {
   cv::Mat mask(img.size(), CV_8UC3);
   cv::Vec3b on = cv::Vec3b(255, 255, 255),
@@ -40,7 +40,7 @@ cv::Mat SkinDetector::rgbMask(cv::Mat &img)
   return mask;
 }
 
-cv::Mat SkinDetector::ycrcbMask(cv::Mat &img, unsigned char thresh)
+cv::Mat SkinDetector::ycrcbMask(const cv::Mat &img, unsigned char thresh)
 {
   // Lower threshold 0    133 77
   // Upper threshold 235   173 127
@@ -53,7 +53,7 @@ cv::Mat SkinDetector::ycrcbMask(cv::Mat &img, unsigned char thresh)
   return mask;
 }
 
-cv::Mat SkinDetector::cutMask(cv::Mat &img, cv::Mat &mask)
+cv::Mat SkinDetector::cutMask(const cv::Mat &img, cv::Mat &mask)
 {
   cv::Mat dst, free;
   cv::filter2D(
@@ -95,7 +95,7 @@ std::tuple<cv::Mat, cv::Point> ellipticKernel(int size)
   return std::make_tuple(kernel, anchor);
 }
 
-cv::Mat SkinDetector::closing(cv::Mat &mask)
+cv::Mat SkinDetector::closing(const cv::Mat &mask)
 {
   cv::GaussianBlur(
     mask, mask,
