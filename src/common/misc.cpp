@@ -116,6 +116,8 @@ ObjectTrace::ObjectTrace(const cv::Mat &binaryImage)
 
 cv::Mat ObjectTrace::draw(const cv::Size &size)
 {
+  cv::Scalar dullGray(68, 68, 68);
+
   cv::Mat drawing = newColor(size);
   if (this->area <= 0)
     return drawing;
@@ -125,24 +127,31 @@ cv::Mat ObjectTrace::draw(const cv::Size &size)
   std::vector<std::vector<cv::Point>> contours;
   std::vector<std::vector<cv::Point>> hulls;
 
+  cv::Scalar contourColor = cv::Scalar(RNG.uniform(0, 256), RNG.uniform(0,256), RNG.uniform(0,256));
+  cv::Scalar hullColor = cv::Scalar(RNG.uniform(0, 256), RNG.uniform(0,256), RNG.uniform(0,256));
+
   contours.emplace_back(std::vector<cv::Point>(this->contour));
   hulls.push_back(std::vector<cv::Point>(this->hull));
 
-  cv::drawContours(drawing, contours, 0, cv::Scalar(RNG.uniform(0, 256), RNG.uniform(0,256), RNG.uniform(0,256)));
-  cv::drawContours(drawing, hulls, 0, cv::Scalar(RNG.uniform(0, 256), RNG.uniform(0,256), RNG.uniform(0,256)));
+  cv::circle(drawing, this->hullCenter, 3, hullColor);
+  cv::circle(drawing, this->contourCenter, 2, contourColor);
+
+  cv::drawContours(drawing, contours, 0, contourColor);
+  cv::drawContours(drawing, hulls, 0, hullColor);
 
   cv::Scalar hullPtColor(RNG.uniform(0, 256), RNG.uniform(0,256), RNG.uniform(0,256));
   for (auto &point : this->hull)
     cv::circle(drawing, point, 2, hullPtColor, -1);
 
   cv::Scalar defectColor(RNG.uniform(0, 256), RNG.uniform(0,256), RNG.uniform(0,256));
-  cv::Scalar defectLine(RNG.uniform(0, 256), RNG.uniform(0,256), RNG.uniform(0,256));
   for(auto &defect : this->hullDefects) {
     cv::Point ptStart(this->contour[defect[0]]);
     cv::Point ptEnd(this->contour[defect[1]]);
     cv::Point ptFar(this->contour[defect[2]]);
 
-    cv::line(drawing, ptStart, ptEnd, defectLine);
+    cv::line(drawing, ptStart, ptFar, dullGray);
+    cv::line(drawing, ptFar, ptEnd, dullGray);
+
     cv::circle(drawing, ptFar, 5, defectColor);
   }
 
@@ -190,6 +199,13 @@ float innerAngle(float px1, float py1, float px2, float py2, float cx1, float cy
 float innerAngle(const cv::Point &p1, const cv::Point &p2, const cv::Point &p3)
 {
   innerAngle(p1.x, p1.y, p2.x, p2.y, p3.x, p3.y);
+}
+
+cv::Point midpoint(const cv::Point& a, const cv::Point& b) {
+  cv::Point ret;
+  ret.x = (a.x + b.x) / 2;
+  ret.y = (a.y + b.y) / 2;
+  return ret;
 }
 
 // float innerAngle(const cv::Point &p1, const cv::Point &p2, const cv::Point &p3)

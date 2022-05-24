@@ -66,4 +66,6 @@ public:
 float innerAngle(float px1, float py1, float px2, float py2, float cx1, float cy1);
 float innerAngle(const cv::Point &p1, const cv::Point &p2, const cv::Point &p3);
 
+cv::Point midpoint(const cv::Point& a, const cv::Point& b);
+
 #endif

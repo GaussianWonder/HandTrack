@@ -42,16 +42,17 @@ ProcessedFrame processFrame(const cv::Mat &detected) {
 
   cv::RNG RNG((int) time(0));
 
-  cv::circle(drawing, trace.hullCenter, 3, cv::Scalar(RNG.uniform(0, 256), RNG.uniform(0,256), RNG.uniform(0,256)));
-  cv::circle(drawing, trace.contourCenter, 2, cv::Scalar(RNG.uniform(0, 256), RNG.uniform(0,256), RNG.uniform(0,256)));
+  cv::Scalar targetBoxColor = cv::Scalar(RNG.uniform(0, 255), RNG.uniform(0, 255), RNG.uniform(0, 255));
 
   cv::Rect boundingBox = cv::boundingRect(trace.hull);
-  cv::rectangle(drawing, boundingBox, cv::Scalar(RNG.uniform(0, 255), RNG.uniform(0, 255), RNG.uniform(0, 255)));
+  cv::rectangle(drawing, boundingBox, targetBoxColor);
 
   cv::Point center = cv::Point(boundingBox.x + boundingBox.width / 2, boundingBox.y + boundingBox.height / 2);
-  cv::circle(drawing, center, 5, cv::Scalar(RNG.uniform(0, 255), RNG.uniform(0, 255), RNG.uniform(0, 255)));
+  cv::circle(drawing, center, 5, targetBoxColor);
 
-  cv::Scalar fingertipColor(RNG.uniform(0, 256), RNG.uniform(0,256), RNG.uniform(0,256));
+  std::vector<cv::Point> fingertipCandidates;
+  double minDist = detected.rows + detected.cols + 1;
+  double maxDist = -1;
   for (auto &point : trace.hullDefects) {
     cv::Point ptStart(trace.contour[point[0]]);
     cv::Point ptEnd(trace.contour[point[1]]);
@@ -60,9 +61,57 @@ ProcessedFrame processFrame(const cv::Mat &detected) {
     double angle = std::atan2(center.y - ptStart.y, center.x - ptStart.x) * 180 / CV_PI;
     double inAngle = innerAngle(ptStart.x, ptStart.y, ptEnd.x, ptEnd.y, ptFar.x, ptFar.y);
     double length = std::sqrt(std::pow(ptStart.x - ptFar.x, 2) + std::pow(ptStart.y - ptFar.y, 2));
-    if (angle > -30 && angle < 160 && std::abs(inAngle) > 20 && std::abs(inAngle) < 120 && length > 0.1 * boundingBox.height) {
-      cv::circle(drawing, ptStart, 9, fingertipColor, cv::FILLED);
+
+    const bool isInnerFinger = angle > -30 && angle < 160 && std::abs(inAngle) > 20 && std::abs(inAngle) < 120 && length > 0.1 * boundingBox.height;
+    if (isInnerFinger) {
+      fingertipCandidates.push_back(ptStart);
+      fingertipCandidates.push_back(ptEnd);
+
+      const double dist = cv::norm(ptStart - ptEnd);
+      if (dist < minDist)
+        minDist = dist;
+      if (dist > maxDist)
+        maxDist = dist;
     }
+  }
+
+  std::size_t fingertipCandidatesSize = fingertipCandidates.size();
+  std::vector<cv::Point> fingertips;
+  auto addToFingertipsIfUnique = [&](const cv::Point &point) {
+    if (std::find(fingertips.begin(), fingertips.end(), point) == fingertips.end())
+      fingertips.push_back(point);
+  };
+
+  for (std::size_t i = 0; i < fingertipCandidatesSize; ++i) {
+    const cv::Point &prevPoint = fingertipCandidates[(i + fingertipCandidatesSize - 1) % fingertipCandidatesSize];
+    const cv::Point &point = fingertipCandidates[i];
+    const cv::Point &nextPoint = fingertipCandidates[(i + 1) % fingertipCandidatesSize];
+
+    const double d1 = cv::norm(point - prevPoint);
+    const double d2 = cv::norm(point - nextPoint);
+
+    const bool leftCloser = d1 < minDist;
+    const bool rightCloser = d2 < minDist;
+
+    if (leftCloser) {
+      addToFingertipsIfUnique(midpoint(point, prevPoint));
+    }
+
+    if (rightCloser) {
+      addToFingertipsIfUnique(midpoint(point, nextPoint));
+    }
+
+    if (!leftCloser && !rightCloser) {
+      addToFingertipsIfUnique(point);
+    }
+  }
+
+  cv::Scalar fingertipColor(RNG.uniform(0, 256), RNG.uniform(0,256), RNG.uniform(0,256));
+  for (std::size_t i = 0; i < fingertips.size(); ++i) {
+    const cv::Point &point = fingertips[i];
+
+    cv::circle(drawing, point, 9, fingertipColor, cv::FILLED);
+    cv::putText(drawing, std::to_string(i), point, cv::FONT_HERSHEY_SIMPLEX, 0.75, fingertipColor);
   }
 
   return std::make_tuple(detected, drawing);
