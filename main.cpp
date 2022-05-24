@@ -111,7 +111,12 @@ ProcessedFrame processFrame(const cv::Mat &detected) {
     const cv::Point &point = fingertips[i];
 
     cv::circle(drawing, point, 9, fingertipColor, cv::FILLED);
-    cv::putText(drawing, std::to_string(i), point, cv::FONT_HERSHEY_SIMPLEX, 0.75, fingertipColor);
+
+    const cv::Point fromCenter = (point - trace.contourCenter) * 1.15f;
+    const cv::Point extendedEnd = trace.contourCenter + fromCenter;
+    cv::line(drawing, trace.contourCenter, extendedEnd, fingertipColor);
+
+    cv::putText(drawing, std::to_string(i), extendedEnd, cv::FONT_HERSHEY_SIMPLEX, 0.75, fingertipColor);
   }
 
   return std::make_tuple(detected, drawing);
@@ -127,8 +132,6 @@ int main() {
   Logger::init();
 
   // Create instance of VideoCapture
-  // cv::VideoCapture capture(VIDEO("test.mp4"));
-  // cv::VideoCapture capture(VIDEO("test2.mp4"));
   // cv::VideoCapture capture(VIDEO("test3.mp4"));
   // cv::VideoCapture capture(VIDEO("test_clean.mp4"));
   cv::VideoCapture capture(VIDEO("smaller_test.mp4"));
@@ -162,6 +165,17 @@ int main() {
     cv::imshow(CAMERA, frames[slider.getCurrentIndex()]);
     cv::imshow(HAND_MASK, std::get<0>(result));
     cv::imshow(HAND_EDGE, std::get<1>(result));
+
+    cv::Mat overlay = frames[slider.getCurrentIndex()].clone();
+    cv::Mat &drawing = std::get<1>(result);
+    for (std::size_t i = 0; i < drawing.rows; ++i) {
+      for (std::size_t j = 0; j < drawing.cols; ++j) {
+        if (drawing.at<cv::Vec3b>(i, j) != cv::Vec3b(0, 0, 0)) {
+          overlay.at<cv::Vec3b>(i, j) = drawing.at<cv::Vec3b>(i, j);
+        }
+      }
+    }
+    cv::imshow("Overlay", overlay);
   };
 
   // Before entering the event loop create the windows and assign control callbacks
