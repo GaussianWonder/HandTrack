@@ -44,6 +44,10 @@ cv::Mat scaleImage(const cv::Mat &image, const double scale, const int type = CV
 cv::Mat newGray(const cv::Size &size, const cv::Scalar &color = cv::Scalar::all(0));
 cv::Mat newColor(const cv::Size &size, const cv::Scalar &color = cv::Scalar::all(0));
 
+/**
+ * @brief The trace of an object
+ * This is drawable too
+ */
 class ObjectTrace {
 public:
   std::vector<cv::Point> contour;

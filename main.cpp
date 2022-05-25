@@ -21,6 +21,9 @@
 #define GAUSSIAN_BLUR_KERNEL "Blur Kernel"
 #define EROSION_KERNEL "Erode Kernel"
 
+/**
+ * @brief Unsafe helper function to get a SkinDetector out of a void*. Used to set parameters from opencv sliders
+ */
 SkinDetector* fromRaw(void *rawDetector)
 {
   ASSERT(rawDetector != nullptr, "There is no skin detector around here");
@@ -122,12 +125,6 @@ ProcessedFrame processFrame(const cv::Mat &detected) {
   return std::make_tuple(detected, drawing);
 }
 
-ProcessedFrame skinDetect(const cv::Mat &frame, SkinDetector &detect) {
-  cv::Mat skinMask = newGray(frame.size());
-  detect(frame, skinMask);
-  return processFrame(skinMask);
-}
-
 int main() {
   Logger::init();
 
@@ -157,10 +154,23 @@ int main() {
   Slider slider(frames.size() - inMotion.windowSize);
   // Current key pressed
   KEY operation = KEY::NONE;
- 
+
+  // The mask each detector should produce
+  cv::Mat skinMask;
+  // Processing slider for skin mask generators
+  Slider processingTypeSlider({
+    [&]() {
+      detect(frames[slider.getCurrentIndex()], skinMask);
+    },
+    [&]() {
+      inMotion(VideoWindow<8>(gray_frames, slider.getCurrentIndex()), skinMask);
+    }
+  });
+
   // On Event Changed handler
   auto onChangeHandler = [&]() {
-    ProcessedFrame result = skinDetect(frames[slider.getCurrentIndex()], detect);
+    processingTypeSlider.exec();
+    ProcessedFrame result = processFrame(skinMask);
 
     cv::imshow(CAMERA, frames[slider.getCurrentIndex()]);
     cv::imshow(HAND_MASK, std::get<0>(result));
@@ -224,6 +234,14 @@ int main() {
       break;
     case KEY::RIGHT_ARROW:
       slider.next();
+      onChangeHandler();
+      break;
+    case KEY::UP_ARROW:
+      processingTypeSlider.next();
+      onChangeHandler();
+      break;
+    case KEY::DOWN_ARROW:
+      processingTypeSlider.previous();
       onChangeHandler();
       break;
     case KEY::SPACE:

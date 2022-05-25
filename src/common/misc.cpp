@@ -3,6 +3,9 @@
 #include <algorithm>
 #include <math.h>
 
+/**
+ * @brief Convert form opencv int key to enum of named key
+ */
 KEY resolvedKey(const int key)
 {
   switch (key) {
@@ -19,6 +22,14 @@ KEY resolvedKey(const int key)
   }
 }
 
+/**
+ * @brief Scale image proportional to image resolution
+ * 
+ * @param image Image to scale
+ * @param scale number between (0, 1]
+ * @param type cv::Mat pixel type
+ * @return cv::Mat scaled (resized) image
+ */
 cv::Mat scaleImage(const cv::Mat &image, const double scale, const int type)
 {
   const cv::Size scaledSize(image.cols * scale, image.rows * scale);
@@ -27,18 +38,33 @@ cv::Mat scaleImage(const cv::Mat &image, const double scale, const int type)
   return scaled;
 }
 
+/**
+ * @brief Make a new gray (CV_8UC1) image of a given size
+ */
 cv::Mat newGray(const cv::Size &size, const cv::Scalar &color)
 {
   cv::Mat gray(size, CV_8UC1, color);
   return gray;
 }
 
+/**
+ * @brief Make a new RGB (CV_8UC3) image of a given size
+ */
 cv::Mat newColor(const cv::Size &size, const cv::Scalar &color)
 {
   cv::Mat colorImage(size, CV_8UC3, color);
   return colorImage;
 }
 
+/**
+ * @brief Get a vector of frames form a given video capture
+ * This also rescales the input to a given target resolution (rescale to fit)
+ * 
+ * @param capture Video capture to extract from
+ * @param widthTarget rescaling width target
+ * @param heightTarget rescalinig height target
+ * @return std::vector<cv::Mat> rescaled video frames
+ */
 std::vector<cv::Mat> getVideoFrames(cv::VideoCapture &capture, const int widthTarget, const int heightTarget)
 {
   std::vector<cv::Mat> frames;
@@ -59,6 +85,13 @@ std::vector<cv::Mat> getVideoFrames(cv::VideoCapture &capture, const int widthTa
   return frames;
 }
 
+/**
+ * @brief Accepts a vector of frames and applies a color conversion to each frame
+ * 
+ * @param frames frames array, usually from getVideoFrames()
+ * @param conversionType What conversion to apply
+ * @return std::vector<cv::Mat> color converted frames
+ */
 std::vector<cv::Mat> convertAll(const std::vector<cv::Mat> &frames, const cv::ColorConversionCodes conversionType)
 {
   std::vector<cv::Mat> convertedFrames;
@@ -70,6 +103,11 @@ std::vector<cv::Mat> convertAll(const std::vector<cv::Mat> &frames, const cv::Co
   return convertedFrames;
 }
 
+/**
+ * @brief Construct a new Object Trace:: Object Trace object
+ * 
+ * @param binaryImage trace from the contour of a binary image
+ */
 ObjectTrace::ObjectTrace(const cv::Mat &binaryImage)
 {
   std::vector<std::vector<cv::Point>> contours;
@@ -114,6 +152,12 @@ ObjectTrace::ObjectTrace(const cv::Mat &binaryImage)
   }
 }
 
+/**
+ * @brief Draw the traced object
+ * 
+ * @param size size of the desired drawing
+ * @return cv::Mat the drawing
+ */
 cv::Mat ObjectTrace::draw(const cv::Size &size)
 {
   cv::Scalar dullGray(68, 68, 68);
@@ -157,6 +201,8 @@ cv::Mat ObjectTrace::draw(const cv::Size &size)
 
   return drawing;
 }
+
+// Math helpers
 
 float innerAngle(float px1, float py1, float px2, float py2, float cx1, float cy1)
 {
